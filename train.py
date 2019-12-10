@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -9,6 +10,8 @@ from torch.autograd import Variable
 from torchvision import  models, transforms
 from model import AlexNet
 from dataset import CatDogDataset
+from torch.utils.tensorboard import SummaryWriter
+
 
 def weights_init(m):
     if isinstance(m, nn.Conv2d):
@@ -17,6 +20,7 @@ def weights_init(m):
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
+    summaryWriter = SummaryWriter()
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
@@ -27,6 +31,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
         model.train()
         
         train_loss = 0
+        count_batch = 0
         for data in train_dataloader:
             count_batch += 1
 
@@ -41,7 +46,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
 
             outputs = model(inputs)
             pred = torch.argmax(outputs, dim=1)
-            print(pred)
+            # print(pred)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
@@ -49,8 +54,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
 
             if count_batch % 10 == 0:
                 batch_loss = train_loss / (batch_size * count_batch)
-                print('Epoch: {} Batch: {} Loss: {}'.format(epoch, count_batch, batch_loss))
-
+                print('Epoch: {} Batch: {} Loss: {} Time: {}'.format(epoch, count_batch, batch_loss, time.time() - begin_time))
+                begin_time = time.time()
+            
+        model.eval()
         for data in valid_dataloader:
             inputs, labels = data
             print(labels)
@@ -87,6 +94,10 @@ if __name__ == '__main__':
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     valid_dataloader = DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+
+    train_datasize = len(train_dataset)
+    valid_datasize = len(valid_dataset)
+    test_datasize = len(test_dataset)
 
     model = AlexNet(num_classes=2)
     model.apply(weights_init)

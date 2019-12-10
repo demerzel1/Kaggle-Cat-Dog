@@ -19,10 +19,10 @@ class CatDogDataset(Dataset):
             self.img_path.append(line)
         if self.model == 'train':
             class_to_idx = {'dog': 0, 'cat': 1}
-            for line in lines:
-                print(line)
-                print(os.path.basename(line).split('.')[0])
-                print(class_to_idx[os.path.basename(line).split('.')[0]])
+            # for line in lines:
+            #     print(line)
+            #     print(os.path.basename(line).split('.')[0])
+            #     print(class_to_idx[os.path.basename(line).split('.')[0]])
             self.label = [class_to_idx[os.path.basename(line).split('.')[0]] for line in lines]
         self.data_transforms = data_transforms
         self.loader = loader

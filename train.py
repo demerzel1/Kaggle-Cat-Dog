@@ -20,19 +20,23 @@ def weights_init(m):
 
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
-    summaryWriter = SummaryWriter()
+    writer = SummaryWriter()
+    step = 0
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
 
         begin_time = time.time()
 
-        scheduler.step()
+        
         model.train()
         
         train_loss = 0
+        train_acc = 0
         count_batch = 0
+        
         for data in train_dataloader:
+            step += 1
             count_batch += 1
 
             inputs, labels = data
@@ -45,22 +49,40 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, use_gpu):
             optimizer.zero_grad()
 
             outputs = model(inputs)
+            # print(outputs)
             pred = torch.argmax(outputs, dim=1)
             # print(pred)
             loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
+            train_acc += torch.sum(pred == labels).to(torch.float32)
 
             if count_batch % 10 == 0:
                 batch_loss = train_loss / (batch_size * count_batch)
-                print('Epoch: {} Batch: {} Loss: {} Time: {}'.format(epoch, count_batch, batch_loss, time.time() - begin_time))
+                batch_acc = train_acc / (batch_size * count_batch)
+                print('Epoch: {} Batch: {} Loss: {} Acc:{} Time: {}'.format(epoch, count_batch, batch_loss, batch_acc, time.time() - begin_time))
                 begin_time = time.time()
-            
+                writer.add_scalar('Loss/train', batch_loss, step)
+                writer.add_scalar('Acc/train', batch_acc, step)
+        scheduler.step()
+        torch.save(model, './output/epoch_{}.pkl'.format(epoch))
         model.eval()
-        for data in valid_dataloader:
+        for ind, data in enumerate(valid_dataloader):
             inputs, labels = data
-            print(labels)
+            if use_gpu:
+                inputs = Variable(inputs.cuda())
+                labels = Variable(labels.cuda())
+            else:
+                inputs, labels = Variable(inputs), Variable(labels)
+            #print(labels)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            valid_loss = loss.item() / batch_size
+            pred = torch.argmax(outputs, dim=1)
+            valid_acc = torch.sum(pred == labels).to(torch.float32) / batch_size
+            print("Valid index: {} Loss: {} Acc: {}".format(ind, valid_loss, valid_acc))
+
     
 if __name__ == '__main__':
 
@@ -81,7 +103,7 @@ if __name__ == '__main__':
     use_gpu = torch.cuda.is_available()
 
     batch_size = 32
-    num_workers = 4
+    num_workers = 8
 
     train_file = '/Users/demerzel/PycharmProjects/cat-dog/data/train.txt'
     valid_file = '/Users/demerzel/PycharmProjects/cat-dog/data/valid.txt'
@@ -99,9 +121,15 @@ if __name__ == '__main__':
     valid_datasize = len(valid_dataset)
     test_datasize = len(test_dataset)
 
+    num_classes = 2
+    
     model = AlexNet(num_classes=2)
     model.apply(weights_init)
-
+    '''
+    model = models.alexnet(pretrained=True)
+    num_ftrs = model.classifier[-1].in_features
+    model.classifier[-1] = nn.Linear(num_ftrs, num_classes)
+    '''
     if use_gpu:
         model = model.cuda()
     
